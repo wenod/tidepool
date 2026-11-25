@@ -47,6 +47,12 @@ class TidesTest(unittest.TestCase):
         self.assertIn("Tides at San Francisco", page)
         self.assertIn("Next high: Tue 01 Dec 05:45", page)
 
+    def test_dashboard_uses_the_below_threshold(self):
+        default = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
+        higher = dashboard("San Francisco", self.sf, datetime(2026, 12, 1), below_ft=0.5)
+        self.assertGreater(higher.count("<li>"), default.count("<li>"))
+        self.assertEqual(higher.count("<li>"), len(tidepool_windows(self.sf, 0.5)))
+
     def test_dashboard_shows_each_days_range_once(self):
         page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
         rows = re.findall(r'<tr class="(?:low|high)">(.*?)</tr>', page)
@@ -124,6 +130,39 @@ class CliTest(unittest.TestCase):
             page = html.read_text()
             self.assertIn("Tides at San Francisco, CA", page)
             self.assertIn("(1.65 m)", page)
+
+    def windows(self, output):
+        line = next(l for l in output.splitlines() if l.startswith("Tidepool windows"))
+        return int(line.rsplit(":", 1)[1])
+
+    def test_below_finds_more_windows_than_the_default(self):
+        self.assertGreater(self.windows(self.run_cli("--below", "0.5")), self.windows(self.run_cli()))
+
+    def test_below_defaults_to_minus_tides(self):
+        sf = load(FIXTURES / "hilo-9414290.json")
+        self.assertEqual(self.windows(self.run_cli()), len(tidepool_windows(sf)))
+
+    def test_below_is_passed_to_the_dashboard(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "sf.html"
+            self.run_cli("--below", "0.5", "--html", str(out))
+            sf = load(FIXTURES / "hilo-9414290.json")
+            self.assertEqual(out.read_text().count("<li>"), len(tidepool_windows(sf, 0.5)))
+
+    def test_below_in_feet_with_metric_dashboard(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "sf.html"
+            printed = self.run_cli("--below", "0.5", "--units", "metric", "--html", str(out))
+            sf = load(FIXTURES / "hilo-9414290.json")
+            self.assertEqual(self.windows(printed), len(tidepool_windows(sf, 0.5)))
+            page = out.read_text()
+            self.assertEqual(page.count("<li>"), len(tidepool_windows(sf, 0.5)))
+            self.assertNotIn(" ft", page)
+
+    def test_empty_metric_dashboard_states_the_threshold_in_meters(self):
+        page = dashboard("San Francisco", load(FIXTURES / "hilo-9414290.json"), datetime(2026, 12, 1),
+                         units="metric", below_ft=-10)
+        self.assertIn("No low tides at or below -3.05 m this month.", page)
 
 
 if __name__ == "__main__":

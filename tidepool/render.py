@@ -58,7 +58,7 @@ def _first_of_day(tides: list[Tide]) -> list[bool]:
     return [i == 0 or t.when.date() != tides[i - 1].when.date() for i, t in enumerate(tides)]
 
 
-def dashboard(station: str, tides: list[Tide], now: datetime, units: str = "imperial") -> str:
+def dashboard(station: str, tides: list[Tide], now: datetime, units: str = "imperial", below_ft: float = 0.0) -> str:
     unit = unit_label(units)
     rows = "".join(
         f'<tr class="{"low" if t.is_low else "high"}"><td>{t.when:%a %d %b %H:%M}</td>'
@@ -68,8 +68,11 @@ def dashboard(station: str, tides: list[Tide], now: datetime, units: str = "impe
     )
     windows = "".join(
         f"<li>{w.start:%a %d %b %H:%M}–{w.end:%H:%M}, low {height(w.low.height_ft, units)} {unit}</li>"
-        for w in tidepool_windows(tides)
-    ) or "<li>No minus tides this month.</li>"
+        for w in tidepool_windows(tides, below_ft)
+    ) or (
+        "<li>No minus tides this month.</li>" if below_ft == 0
+        else f"<li>No low tides at or below {height(below_ft, units) if units == 'metric' else f'{below_ft:g}'} {unit} this month.</li>"
+    )
     return PAGE.format(
         title=escape(f"Tides at {station}"),
         next_high=escape(when(next_tide(tides, now, "H"), units)),
