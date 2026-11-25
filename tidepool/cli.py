@@ -1,4 +1,4 @@
-"""`python -m tidepool PREDICTIONS.json [--station NAME | --station-id ID] [--html OUT]`"""
+"""`python -m tidepool PREDICTIONS.json [--station NAME | --station-id ID] [--html OUT] [--below FEET]`"""
 from __future__ import annotations
 
 import argparse
@@ -18,6 +18,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stations", type=Path, default=DEFAULT_STATIONS, help="stations JSON file")
     parser.add_argument("--now", type=datetime.fromisoformat, default=None, help="pretend it's this time")
     parser.add_argument("--html", type=Path, help="write the dashboard here")
+    parser.add_argument("--below", type=float, default=0.0, metavar="FEET",
+                        help="count low tides at or below this height as tidepool windows (default 0.0)")
     args = parser.parse_args(argv)
 
     station = args.station
@@ -35,8 +37,8 @@ def main(argv: list[str] | None = None) -> int:
     high, low = next_tide(tides, now, "H"), next_tide(tides, now, "L")
     print(f"Next high: {high.when:%a %d %b %H:%M} ({high.height_ft:.1f} ft)" if high else "Next high: none")
     print(f"Next low:  {low.when:%a %d %b %H:%M} ({low.height_ft:.1f} ft)" if low else "Next low: none")
-    print(f"Tidepool windows this month: {len(tidepool_windows(tides))}")
+    print(f"Tidepool windows this month: {len(tidepool_windows(tides, args.below))}")
     if args.html:
-        args.html.write_text(dashboard(station, tides, now))
+        args.html.write_text(dashboard(station, tides, now, below_ft=args.below))
         print(f"Wrote {args.html}")
     return 0
