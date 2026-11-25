@@ -1,7 +1,11 @@
+import io
+import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import date, datetime
 from pathlib import Path
 
+from tidepool.cli import main
 from tidepool.render import dashboard
 from tidepool.tides import daily_range, load, next_tide, parse_predictions, tidepool_windows
 
@@ -41,6 +45,55 @@ class TidesTest(unittest.TestCase):
         page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
         self.assertIn("Tides at San Francisco", page)
         self.assertIn("Next high: Tue 01 Dec 05:45", page)
+
+    def test_dashboard_in_feet_by_default(self):
+        page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
+        self.assertIn("Next high: Tue 01 Dec 05:45 (5.4 ft)", page)
+        self.assertIn("<th>Height (ft)</th>", page)
+        self.assertIn("<td>5.41</td>", page)
+        self.assertIn("<td>4.771</td>", page)
+        self.assertIn("low -0.2 ft", page)
+
+    def test_dashboard_in_meters(self):
+        page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1), units="metric")
+        self.assertIn("Next high: Tue 01 Dec 05:45 (1.65 m)", page)
+        self.assertIn("Next low: Tue 01 Dec 11:37 (0.66 m)", page)
+        self.assertIn("<th>Height (m)</th>", page)
+        self.assertIn("<td>1.65</td>", page)
+        self.assertIn("<td>1.45</td>", page)
+        self.assertIn("low -0.06 m", page)
+        self.assertNotIn(" ft", page)
+
+
+class CliTest(unittest.TestCase):
+    def run_cli(self, *extra):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = main([str(FIXTURES / "hilo-9414290.json"), "--now", "2026-12-01T00:00", *extra])
+        self.assertEqual(code, 0)
+        return out.getvalue()
+
+    def test_feet_by_default(self):
+        out = self.run_cli()
+        self.assertIn("Next high: Tue 01 Dec 05:45 (5.4 ft)", out)
+        self.assertIn("Next low:  Tue 01 Dec 11:37 (2.2 ft)", out)
+        self.assertEqual(out, self.run_cli("--units", "imperial"))
+
+    def test_metric(self):
+        out = self.run_cli("--units", "metric")
+        self.assertIn("Next high: Tue 01 Dec 05:45 (1.65 m)", out)
+        self.assertIn("Next low:  Tue 01 Dec 11:37 (0.66 m)", out)
+        self.assertNotIn("ft", out)
+
+    def test_metric_dashboard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            html = Path(tmp) / "sf.html"
+            self.run_cli("--units", "metric", "--html", str(html))
+            self.assertIn("(1.65 m)", html.read_text())
+
+    def test_rejects_unknown_units(self):
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            main([str(FIXTURES / "hilo-9414290.json"), "--units", "furlongs"])
 
 
 if __name__ == "__main__":
