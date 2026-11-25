@@ -1,0 +1,26 @@
+[
+  {
+    "id": "9414290",
+    "name": "San Francisco",
+    "state": "CA",
+    "lat": 37.806305,
+    "lng": -122.46589,
+    "timezone": "PST"
+  },
+  {
+    "id": "8518750",
+    "name": "The Battery",
+    "state": "NY",
+    "lat": 40.700554,
+    "lng": -74.01417,
+    "timezone": "EST"
+  },
+  {
+    "id": "9447130",
+    "name": "Seattle",
+    "state": "WA",
+    "lat": 47.60264,
+    "lng": -122.3393,
+    "timezone": "PST"
+  }
+]
