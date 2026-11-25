@@ -1,4 +1,5 @@
 import io
+import json
 import re
 import tempfile
 import unittest
@@ -90,6 +91,12 @@ class CliTest(unittest.TestCase):
             self.run_cli("--below", "0.5", "--html", str(out))
             sf = load(FIXTURES / "hilo-9414290.json")
             self.assertEqual(out.read_text().count("<li>"), len(tidepool_windows(sf, 0.5)))
+
+    def test_json_windows_follow_below(self):
+        sf = load(FIXTURES / "hilo-9414290.json")
+        data = json.loads(self.run_cli("--json", "--below", "0.5"))
+        self.assertEqual(data["below_ft"], 0.5)
+        self.assertEqual(len(data["windows"]), len(tidepool_windows(sf, 0.5)))
 
 
 if __name__ == "__main__":
