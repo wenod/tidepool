@@ -1,3 +1,4 @@
+import re
 import unittest
 from datetime import date, datetime
 from pathlib import Path
@@ -41,6 +42,18 @@ class TidesTest(unittest.TestCase):
         page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
         self.assertIn("Tides at San Francisco", page)
         self.assertIn("Next high: Tue 01 Dec 05:45", page)
+
+    def test_dashboard_shows_each_days_range_once(self):
+        page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
+        rows = re.findall(r'<tr class="(?:low|high)">(.*?)</tr>', page)
+        self.assertEqual(len(rows), len(self.sf))
+        ranges = [re.findall(r"<td>(.*?)</td>", row)[-1] for row in rows]
+        days = {t.when.date() for t in self.sf}
+        self.assertEqual(len(days), 31)
+        self.assertEqual(sum(1 for r in ranges if r), 31)
+        for t, r in zip(self.sf, ranges):
+            if r:
+                self.assertEqual(r, str(daily_range(self.sf, t.when.date())))
 
 
 if __name__ == "__main__":
