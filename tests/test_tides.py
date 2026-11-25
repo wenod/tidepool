@@ -1,7 +1,11 @@
+import io
+import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import date, datetime
 from pathlib import Path
 
+from tidepool.cli import main
 from tidepool.render import dashboard
 from tidepool.tides import daily_range, load, next_tide, parse_predictions, tidepool_windows
 
@@ -41,6 +45,38 @@ class TidesTest(unittest.TestCase):
         page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
         self.assertIn("Tides at San Francisco", page)
         self.assertIn("Next high: Tue 01 Dec 05:45", page)
+
+    def test_dashboard_uses_the_below_threshold(self):
+        default = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
+        higher = dashboard("San Francisco", self.sf, datetime(2026, 12, 1), below_ft=0.5)
+        self.assertGreater(higher.count("<li>"), default.count("<li>"))
+        self.assertEqual(higher.count("<li>"), len(tidepool_windows(self.sf, 0.5)))
+
+
+class CliTest(unittest.TestCase):
+    def run_cli(self, *args):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(main([str(FIXTURES / "hilo-9414290.json"), "--now", "2026-12-01T00:00", *args]), 0)
+        return out.getvalue()
+
+    def windows(self, output):
+        line = next(l for l in output.splitlines() if l.startswith("Tidepool windows"))
+        return int(line.rsplit(":", 1)[1])
+
+    def test_below_finds_more_windows_than_the_default(self):
+        self.assertGreater(self.windows(self.run_cli("--below", "0.5")), self.windows(self.run_cli()))
+
+    def test_below_defaults_to_minus_tides(self):
+        sf = load(FIXTURES / "hilo-9414290.json")
+        self.assertEqual(self.windows(self.run_cli()), len(tidepool_windows(sf)))
+
+    def test_below_is_passed_to_the_dashboard(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "sf.html"
+            self.run_cli("--below", "0.5", "--html", str(out))
+            sf = load(FIXTURES / "hilo-9414290.json")
+            self.assertEqual(out.read_text().count("<li>"), len(tidepool_windows(sf, 0.5)))
 
 
 if __name__ == "__main__":
