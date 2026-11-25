@@ -53,13 +53,18 @@ def _range(tides: list[Tide], t: Tide, units: str) -> str:
     return height(r, units) if units == "metric" else str(r)
 
 
+def _first_of_day(tides: list[Tide]) -> list[bool]:
+    """True for each tide that is the first row of its day in the table."""
+    return [i == 0 or t.when.date() != tides[i - 1].when.date() for i, t in enumerate(tides)]
+
+
 def dashboard(station: str, tides: list[Tide], now: datetime, units: str = "imperial") -> str:
     unit = unit_label(units)
     rows = "".join(
         f'<tr class="{"low" if t.is_low else "high"}"><td>{t.when:%a %d %b %H:%M}</td>'
         f"<td>{height(t.height_ft, units, 2)}</td><td>{'Low' if t.is_low else 'High'}</td>"
-        f"<td>{_range(tides, t, units)}</td></tr>"
-        for t in tides
+        f"<td>{_range(tides, t, units) if first else ''}</td></tr>"
+        for t, first in zip(tides, _first_of_day(tides))
     )
     windows = "".join(
         f"<li>{w.start:%a %d %b %H:%M}–{w.end:%H:%M}, low {height(w.low.height_ft, units)} {unit}</li>"

@@ -1,4 +1,5 @@
 import io
+import re
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -45,6 +46,27 @@ class TidesTest(unittest.TestCase):
         page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
         self.assertIn("Tides at San Francisco", page)
         self.assertIn("Next high: Tue 01 Dec 05:45", page)
+
+    def test_dashboard_shows_each_days_range_once(self):
+        page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
+        rows = re.findall(r'<tr class="(?:low|high)">(.*?)</tr>', page)
+        self.assertEqual(len(rows), len(self.sf))
+        ranges = [re.findall(r"<td>(.*?)</td>", row)[-1] for row in rows]
+        days = {t.when.date() for t in self.sf}
+        self.assertEqual(len(days), 31)
+        self.assertEqual(sum(1 for r in ranges if r), 31)
+        for t, r in zip(self.sf, ranges):
+            if r:
+                self.assertEqual(r, str(daily_range(self.sf, t.when.date())))
+
+    def test_metric_dashboard_shows_each_days_range_once_in_meters(self):
+        page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1), units="metric")
+        rows = re.findall(r'<tr class="(?:low|high)">(.*?)</tr>', page)
+        ranges = [re.findall(r"<td>(.*?)</td>", row)[-1] for row in rows]
+        self.assertEqual(sum(1 for r in ranges if r), 31)
+        for t, r in zip(self.sf, ranges):
+            if r:
+                self.assertEqual(r, f"{daily_range(self.sf, t.when.date()) * 0.3048:.2f}")
 
     def test_dashboard_in_feet_by_default(self):
         page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
@@ -94,6 +116,14 @@ class CliTest(unittest.TestCase):
     def test_rejects_unknown_units(self):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             main([str(FIXTURES / "hilo-9414290.json"), "--units", "furlongs"])
+
+    def test_station_id_with_metric_dashboard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            html = Path(tmp) / "sf.html"
+            self.run_cli("--station-id", "9414290", "--units", "metric", "--html", str(html))
+            page = html.read_text()
+            self.assertIn("Tides at San Francisco, CA", page)
+            self.assertIn("(1.65 m)", page)
 
 
 if __name__ == "__main__":
