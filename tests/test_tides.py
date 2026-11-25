@@ -1,4 +1,5 @@
 import io
+import re
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -51,6 +52,18 @@ class TidesTest(unittest.TestCase):
         higher = dashboard("San Francisco", self.sf, datetime(2026, 12, 1), below_ft=0.5)
         self.assertGreater(higher.count("<li>"), default.count("<li>"))
         self.assertEqual(higher.count("<li>"), len(tidepool_windows(self.sf, 0.5)))
+
+    def test_dashboard_shows_each_days_range_once(self):
+        page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
+        rows = re.findall(r'<tr class="(?:low|high)">(.*?)</tr>', page)
+        self.assertEqual(len(rows), len(self.sf))
+        ranges = [re.findall(r"<td>(.*?)</td>", row)[-1] for row in rows]
+        days = {t.when.date() for t in self.sf}
+        self.assertEqual(len(days), 31)
+        self.assertEqual(sum(1 for r in ranges if r), 31)
+        for t, r in zip(self.sf, ranges):
+            if r:
+                self.assertEqual(r, str(daily_range(self.sf, t.when.date())))
 
 
 class CliTest(unittest.TestCase):

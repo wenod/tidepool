@@ -3,8 +3,10 @@
 Tides from NOAA's predictions: the next high and low, each day's range, and the minus tides worth a trip to the tidepools.
 
 ```bash
-python3 -m tidepool tests/fixtures/hilo-9414290.json --station "San Francisco" --html out/sf.html
+python3 -m tidepool tests/fixtures/hilo-9414290.json --station-id 9414290 --html out/sf.html
 ```
+
+`--station-id` looks up the name and state in `tests/fixtures/stations.json` (or `--stations FILE`); `--station NAME` sets the name by hand and wins if both are given.
 
 Tidepool windows are low tides at or below 0 ft by default; `--below FEET` raises or lowers that threshold for both the printed count and the dashboard (e.g. `--below 0.5`).
 
