@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime
 from pathlib import Path
 
 from .render import dashboard
-from .tides import load, next_tide, tidepool_windows
+from .tides import NoaaError, load, next_tide, tidepool_windows
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -17,7 +18,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--html", type=Path, help="write the dashboard here")
     args = parser.parse_args(argv)
 
-    tides = load(args.predictions)
+    try:
+        tides = load(args.predictions)
+    except NoaaError as error:
+        print(f"NOAA error: {error}", file=sys.stderr)
+        return 1
     now = args.now or datetime.now()
     high, low = next_tide(tides, now, "H"), next_tide(tides, now, "L")
     print(f"Next high: {high.when:%a %d %b %H:%M} ({high.height_ft:.1f} ft)" if high else "Next high: none")

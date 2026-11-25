@@ -1,9 +1,12 @@
+import io
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import date, datetime
 from pathlib import Path
 
+from tidepool.cli import main
 from tidepool.render import dashboard
-from tidepool.tides import daily_range, load, next_tide, parse_predictions, tidepool_windows
+from tidepool.tides import NoaaError, daily_range, load, next_tide, parse_predictions, tidepool_windows
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -36,6 +39,19 @@ class TidesTest(unittest.TestCase):
 
     def test_empty_response(self):
         self.assertEqual(parse_predictions({}), [])
+
+    def test_noaa_error_response_raises_with_its_message(self):
+        with self.assertRaises(NoaaError) as caught:
+            load(FIXTURES / "error-no-predictions.json")
+        self.assertIn("No Predictions data was found", str(caught.exception))
+
+    def test_cli_prints_noaa_error_and_returns_1(self):
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            status = main([str(FIXTURES / "error-no-predictions.json")])
+        self.assertEqual(status, 1)
+        self.assertIn("No Predictions data was found", err.getvalue())
+        self.assertNotIn("Next high", out.getvalue())
 
     def test_dashboard_names_the_station(self):
         page = dashboard("San Francisco", self.sf, datetime(2026, 12, 1))
