@@ -20,8 +20,19 @@ class Tide:
         return self.kind == "L"
 
 
+class NoaaError(Exception):
+    """NOAA answered with an error instead of predictions."""
+
+
 def parse_predictions(raw: dict) -> list[Tide]:
-    """Tides from a NOAA CO-OPS `predictions` response (interval=hilo), oldest first."""
+    """Tides from a NOAA CO-OPS `predictions` response (interval=hilo), oldest first.
+
+    Raises NoaaError when the response is NOAA's `{"error": {"message": ...}}` shape.
+    """
+    if "error" in raw:
+        error = raw["error"]
+        message = error.get("message") if isinstance(error, dict) else error
+        raise NoaaError(str(message or "NOAA returned an error"))
     tides = [
         Tide(datetime.strptime(p["t"], "%Y-%m-%d %H:%M"), float(p["v"]), p["type"])
         for p in raw.get("predictions", [])
